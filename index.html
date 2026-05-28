@@ -10,7 +10,10 @@
         body { background-color: var(--bg-color); color: var(--text-color); padding: 20px 15px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 500px; background: var(--card-bg); padding: 25px 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); }
         h1 { font-size: 1.5rem; text-align: center; margin-bottom: 5px; color: #3a7bd5; }
-        .status-text { text-align: center; font-size: 0.8rem; color: #2ecc71; margin-bottom: 20px; font-weight: bold; padding: 5px; border-radius: 4px; background: #ebf7ee; }
+        
+        /* 🌟 全新亮眼狀態燈號 */
+        .status-badge { text-align: center; font-size: 0.85rem; margin-bottom: 20px; padding: 8px; border-radius: 8px; font-weight: bold; transition: all 0.3s ease; background: #fff9db; color: #f59f00; }
+        
         .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
         input[type="text"] { flex: 1; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; outline: none; }
         input[type="text"]:focus { border-color: var(--primary-color); }
@@ -27,7 +30,8 @@
 <body>
 <div class="container">
     <h1>🎒時間拖延大師出門list</h1>
-    <div class="status-text" id="statusText">正在開啟本地防護...</div>
+    <div class="status-badge" id="statusBox">📡 正在啟動全自動同步引擎...</div>
+    
     <div class="input-group">
         <input type="text" id="itemInput" placeholder="輸入需要攜帶的物品...如：奶瓶" maxlength="30">
         <button class="add-btn" id="addBtn">新增</button>
@@ -35,19 +39,20 @@
     <ul class="todo-list" id="todoList"></ul>
 </div>
 <script>
-    // 🌟 啟用全新、高相容性且絕不封鎖的專屬雲端管道
-    const API_URL = 'https://kvdb.io/MKs5qY7gA2mRE8wN4vXBce/chuchu_family_live_v1';
-    const LOCAL_KEY = 'chuchu_live_store';
+    // 🌟 更換為 100% 支援前端跨網域（CORS）的 Pantry API
+    const PANTRY_ID = '7f3c6d8a-2b1e-4590-a6c2-84d7e9b01f3a';
+    const BASKET_NAME = 'chuchu_master_list_v2';
+    const API_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET_NAME}`;
+    const LOCAL_KEY = 'chuchu_pantry_store';
 
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
     const todoList = document.getElementById('todoList');
-    const statusText = document.getElementById('statusText');
+    const statusBox = document.getElementById('statusBox');
     
-    // 初始化本地資料結構（預設時間戳記為0）
     let localState = { items: [], ts: 0 }; 
 
-    // 【核心防護 1】：一開網頁，零秒絕對先讀取本地記憶，畫面立刻出來，重整打死不會變空白！
+    // 【核心防護 1】：一開網頁，0秒先抓本地記憶，保證同瀏覽器重整絕對有東西
     const saved = localStorage.getItem(LOCAL_KEY);
     if (saved) {
         try {
@@ -56,62 +61,74 @@
         } catch(e) { console.error(e); }
     }
     renderList();
-    statusText.textContent = '🔒 本地守護中 (重整絕不丟失)';
 
-    // 【核心防護 2】：全自動中央對時同步引擎（每5秒自動執行一次）
+    // 更新狀態燈號的工具
+    function updateStatus(text, type) {
+        statusBox.textContent = text;
+        if (type === 'success') {
+            statusBox.style.background = '#ebf7ee';
+            statusBox.style.color = '#2ecc71';
+        } else if (type === 'error') {
+            statusBox.style.background = '#ffe3e3';
+            statusBox.style.color = '#ff4b4b';
+        } else {
+            statusBox.style.background = '#fff9db';
+            statusBox.style.color = '#f59f00';
+        }
+    }
+
+    // 【核心防護 2】：全自動中央對時同步引擎
     async function autoSyncEngine() {
         try {
-            // 加上隨機時間參數，徹底消滅瀏覽器討厭的舊快取
-            const response = await fetch(`${API_URL}?t=${Date.now()}`);
-            
+            const response = await fetch(API_URL);
             if (response.ok) {
-                const text = await response.text();
-                
-                // 如果雲端完全是空的（全新的通道），且我們本地有打好的東西，立刻傳上去填滿雲端
-                if (!text || text.trim() === "") {
-                    if (localState.items.length > 0) { pushToCloud(); }
-                    return;
-                }
-                
-                const cloudState = JSON.parse(text);
-                if (cloudState && Array.isArray(cloudState.items) && cloudState.ts) {
-                    
-                    // 狀況 A：雲端的時間比較新 -> 代表老公在電腦上改了東西，或是換瀏覽器要同步過來
+                const cloudState = await response.json();
+                if (cloudState && cloudState.ts) {
+                    // 狀況 A：雲端比較新 -> 換瀏覽器或老公改了東西，立刻同步下來
                     if (cloudState.ts > localState.ts) {
                         localState = cloudState;
                         localStorage.setItem(LOCAL_KEY, JSON.stringify(localState));
                         renderList();
-                        statusText.textContent = '☁️ 雙機即時同步中 (自動對時成功)';
+                        updateStatus('🟢 雙機已同步 (已從雲端更新)', 'success');
                     } 
-                    // 狀況 B：我本地的時間比較新 -> 代表我剛剛有新增或勾選，立刻修正雲端
+                    // 狀況 B：本地比較新 -> 剛剛在手機有操作，送上雲端
                     else if (localState.ts > cloudState.ts) {
-                        pushToCloud();
+                        await pushToCloud();
                     } 
-                    // 狀況 C：時間完全一樣 -> 大家都一樣，相安無事
+                    // 狀況 C：完全一致
                     else {
-                        statusText.textContent = '☁️ 雙機即時同步中 (資料已是最最新)';
+                        updateStatus('🟢 雙機已同步 (資料一致)', 'success');
                     }
                 }
-            } else if (response.status === 404 && localState.items.length > 0) {
-                // 雲端還沒有這個檔案，立刻初始化上傳
-                pushToCloud();
+            } else if (response.status === 400 || response.status === 404) {
+                // 雲端還沒有這個資料夾（初次建立），如果本地有東西就推上去
+                if (localState.ts > 0) { await pushToCloud(); }
+                else { updateStatus('🟡 雲端就緒 (等待新增第一個項目)', 'warning'); }
+            } else {
+                throw new Error('雲端回應異常');
             }
         } catch (error) {
-            console.error('同步異常，但本地資料安好：', error);
-            statusText.textContent = '⚠️ 網路連線中 (本地數據安全鎖定)';
+            console.error('同步出錯：', error);
+            updateStatus('🔴 同步暫停 (本地資料安全鎖定)', 'error');
         }
     }
 
-    // 專屬安全寫入函式：拿掉可能引發 CORS 預檢失敗的自訂 Header
+    // 專屬安全上傳
     async function pushToCloud() {
         try {
-            await fetch(API_URL, {
-                method: 'PUT',
-                body: JSON.stringify(localState) // 純文字流送出，相容性最高
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(localState)
             });
-            statusText.textContent = '☁️ 雙機即時同步中 (已同步至雲端)';
+            if (response.ok) {
+                updateStatus('🟢 雙機已同步 (已成功送達雲端)', 'success');
+            } else {
+                throw new Error('寫入失敗');
+            }
         } catch (error) {
             console.error('上傳失敗：', error);
+            updateStatus('🔴 同步暫停 (上傳失敗，鎖定本地)', 'error');
         }
     }
 
@@ -120,12 +137,12 @@
         if (text === '') return;
         
         localState.items.push({ id: Date.now(), text: text, completed: false });
-        localState.ts = Date.now(); // 烙下最新時間戳記
+        localState.ts = Date.now(); 
         
         itemInput.value = '';
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState)); // 0秒鎖死在當下瀏覽器
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState)); 
         renderList(); 
-        pushToCloud(); // 默默推上雲端
+        pushToCloud(); 
     }
 
     function toggleItem(id) {
@@ -175,7 +192,7 @@
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
     
-    // 啟動無感定時對時引擎：一打開網頁先對時一次，之後每 5 秒在背景神不知鬼不覺地同步一次
+    // 一開啟就執行對時，之後每 5 秒背景自動巡邏同步
     autoSyncEngine();
     setInterval(autoSyncEngine, 5000);
 </script>
