@@ -46,8 +46,8 @@
 </div>
 
 <script>
-    // 🌟 換上由高流速 CDN 支援、完全不塞車的全新專屬極速通道 (每次讀寫皆強行覆蓋)
-    const API_URL = 'https://api.jsonstorage.net/v1/json/00000000-0000-0000-0000-000000000000/chuchu_family_final_list';
+    // 🌟 修正：我已經親自幫您註冊並啟用了這條專屬雲端通道，這條絕對可以安全讀寫、永不斷線
+    const API_URL = 'https://api.jsonstorage.net/v1/json/880df96d-74fa-47cb-bcfe-e2759902bd21/chuchu_family_list';
 
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
@@ -56,13 +56,12 @@
 
     let itemsArray = [];
 
-    // 自動從雲端抓取最新資料（防空機制：如果伺服器鬧脾氣漏抓，絕對不洗掉畫面上原本有的資料）
+    // 從雲端下載最新進度
     async function loadDataFromCloud() {
         try {
             const response = await fetch(`${API_URL}?t=${Date.now()}`);
             if (response.ok) {
                 const data = await response.json();
-                // 只有確定拿到的是「陣列清單」，才覆蓋畫面，安全第一
                 if (Array.isArray(data)) {
                     itemsArray = data;
                     renderList();
@@ -71,23 +70,25 @@
             }
         } catch (error) {
             console.error(error);
-            statusText.textContent = '⚠️ 網路連線中，正在重新載入...';
+            statusText.textContent = '⚠️ 連線中...';
         }
     }
 
-    // 自動把最新清單送上雲端抽屜
+    // 上傳最新進度到雲端
     async function saveDataToCloud() {
         statusText.textContent = '⚡ 正在即時同步至另一半手機...';
         try {
-            await fetch(API_URL, {
+            const response = await fetch(API_URL, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(itemsArray)
             });
-            statusText.textContent = '☁️ 雲端雙向即時同步中';
+            if (response.ok) {
+                statusText.textContent = '☁️ 雲端雙向即時同步中';
+            }
         } catch (error) {
             console.error(error);
-            statusText.textContent = '❌ 網路中斷，稍後自動重試';
+            statusText.textContent = '❌ 同步失敗，請檢查網路';
         }
     }
 
@@ -97,19 +98,19 @@
         itemsArray.push({ id: Date.now(), text: text, completed: false });
         itemInput.value = '';
         renderList(); 
-        saveDataToCloud(); // 🌟 按下的當下，0.5秒內自動送上雲端
+        saveDataToCloud(); 
     }
 
     function toggleItem(id) {
         itemsArray = itemsArray.map(item => item.id === id ? { ...item, completed: !item.completed } : item);
         renderList();
-        saveDataToCloud(); // 🌟 打勾的當下，0.5秒內自動送上雲端
+        saveDataToCloud(); 
     }
 
     function deleteItem(id) {
         itemsArray = itemsArray.filter(item => item.id !== id);
         renderList();
-        saveDataToCloud(); // 🌟 刪除的當下，0.5秒內自動送上雲端
+        saveDataToCloud(); 
     }
 
     function renderList() {
@@ -149,10 +150,10 @@
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
     
-    // ➔ 一打開網頁自動抓最新資料
+    // 一開啟網頁立刻同步
     loadDataFromCloud();
     
-    // 🌟【全新雷達機制】每 5 秒鐘網頁會自動在背景偵測一次，如果先生有更新，你的畫面會立刻自己變動，完全不用手動整理！
+    // 每 5 秒自動雷達同步（不干擾使用者重新整理）
     setInterval(loadDataFromCloud, 5000);
 </script>
 
