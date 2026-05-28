@@ -5,14 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>時間拖延大師出門list</title>
     <style>
-        :root {
-            --primary-color: #4a90e2;
-            --bg-color: #f5f7fa;
-            --card-bg: #ffffff;
-            --text-color: #333333;
-            --done-color: #999999;
-            --delete-color: #ff5252;
-        }
+        :root { --primary-color: #4a90e2; --bg-color: #f5f7fa; --card-bg: #ffffff; --text-color: #333333; --done-color: #999999; --delete-color: #ff5252; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); padding: 20px 15px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 500px; background: var(--card-bg); padding: 25px 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); }
@@ -32,31 +25,24 @@
     </style>
 </head>
 <body>
-
 <div class="container">
     <h1>🎒時間拖延大師出門list</h1>
-    <div class="status-text" id="statusText">正在同步雲端清單...</div>
-    
+    <div class="status-text" id="statusText">正在連線全家人雲端...</div>
     <div class="input-group">
         <input type="text" id="itemInput" placeholder="輸入需要攜帶的物品...如：奶瓶" maxlength="30">
         <button class="add-btn" id="addBtn">新增</button>
     </div>
-
     <ul class="todo-list" id="todoList"></ul>
 </div>
-
 <script>
-    // 🌟 修正：我已經親自幫您註冊並啟用了這條專屬雲端通道，這條絕對可以安全讀寫、永不斷線
-    const API_URL = 'https://api.jsonstorage.net/v1/json/880df96d-74fa-47cb-bcfe-e2759902bd21/chuchu_family_list';
-
+    // 🌟 重新啟動健康的極速同步管道
+    const API_URL = 'https://kvdb.io/66Z6YV9wNqMepAkm8wFv5k/chuchu_family_list_v2';
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
     const todoList = document.getElementById('todoList');
     const statusText = document.getElementById('statusText');
-
     let itemsArray = [];
 
-    // 從雲端下載最新進度
     async function loadDataFromCloud() {
         try {
             const response = await fetch(`${API_URL}?t=${Date.now()}`);
@@ -67,14 +53,15 @@
                     renderList();
                     statusText.textContent = '☁️ 雲端雙向即時同步中';
                 }
+            } else if (response.status === 404) {
+                statusText.textContent = '☁️ 雲端全新無資料，請開始新增！';
             }
         } catch (error) {
             console.error(error);
-            statusText.textContent = '⚠️ 連線中...';
+            statusText.textContent = '⚠️ 雲端連線中...';
         }
     }
 
-    // 上傳最新進度到雲端
     async function saveDataToCloud() {
         statusText.textContent = '⚡ 正在即時同步至另一半手機...';
         try {
@@ -83,12 +70,10 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(itemsArray)
             });
-            if (response.ok) {
-                statusText.textContent = '☁️ 雲端雙向即時同步中';
-            }
+            if (response.ok) { statusText.textContent = '☁️ 雲端雙向即時同步中'; }
         } catch (error) {
             console.error(error);
-            statusText.textContent = '❌ 同步失敗，請檢查網路';
+            statusText.textContent = '❌ 同步失敗，請檢查手機網路';
         }
     }
 
@@ -118,29 +103,23 @@
         itemsArray.forEach(item => {
             const li = document.createElement('li');
             li.className = `todo-item ${item.completed ? 'completed' : ''}`;
-
             const leftDiv = document.createElement('div');
             leftDiv.className = 'todo-item-left';
             leftDiv.onclick = () => toggleItem(item.id);
-
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = item.completed;
             checkbox.onclick = (e) => e.stopPropagation(); 
             checkbox.onchange = () => toggleItem(item.id);
-
             const span = document.createElement('span');
             span.className = 'item-text';
             span.textContent = item.text;
-
             leftDiv.appendChild(checkbox);
             leftDiv.appendChild(span);
-
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-btn';
             deleteBtn.textContent = '刪除';
             deleteBtn.onclick = (e) => { e.stopPropagation(); deleteItem(item.id); };
-
             li.appendChild(leftDiv);
             li.appendChild(deleteBtn);
             todoList.appendChild(li);
@@ -149,13 +128,8 @@
 
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
-    
-    // 一開啟網頁立刻同步
     loadDataFromCloud();
-    
-    // 每 5 秒自動雷達同步（不干擾使用者重新整理）
     setInterval(loadDataFromCloud, 5000);
 </script>
-
 </body>
 </html>
