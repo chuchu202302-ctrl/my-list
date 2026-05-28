@@ -27,7 +27,7 @@
 <body>
 <div class="container">
     <h1>🎒時間拖延大師出門list</h1>
-    <div class="status-text" id="statusText">本機安全防護中</div>
+    <div class="status-text" id="statusText">系統安全防護中</div>
     <div class="input-group">
         <input type="text" id="itemInput" placeholder="輸入需要攜帶的物品...如：奶瓶" maxlength="30">
         <button class="add-btn" id="addBtn">新增</button>
@@ -35,96 +35,109 @@
     <ul class="todo-list" id="todoList"></ul>
 </div>
 <script>
-    // 🌟 獨立公共背景通道
-    const API_URL = 'https://kvdb.io/A7b9C2d4E6f8G0h1J3k5M7/chuchu_family_perfect_list';
+    // 更換全新、格式絕對合法的雲端專屬通道
+    const API_URL = 'https://kvdb.io/66Z6YV9wNqMepAkm8wFv5k/chuchu_family_v5';
+    const LOCAL_KEY = 'chuchu_list_v5';
+
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
     const todoList = document.getElementById('todoList');
     const statusText = document.getElementById('statusText');
     
-    let itemsArray = []; 
+    // 初始化狀態結構（帶有最後修改時間戳記）
+    let localState = { items: [], ts: 0 }; 
 
-    // 【核心保險 1】：一打開網頁，零秒直接讀取手機本機記憶，保證絕對不會看到空白！
-    const localData = localStorage.getItem('chuchu_storage_list');
-    if (localData) {
+    // 【步驟 1】：一打開網頁，零秒直接讀取手機本機記憶，這行跑完就注定重整絕不會變空！
+    const saved = localStorage.getItem(LOCAL_KEY);
+    if (saved) {
         try {
-            itemsArray = JSON.parse(localData);
-            if (!Array.isArray(itemsArray)) itemsArray = [];
-        } catch(e) {
-            itemsArray = [];
-        }
+            const parsed = JSON.parse(saved);
+            if (parsed && Array.isArray(parsed.items)) { localState = parsed; }
+        } catch(e) { console.error(e); }
     }
-    // 先把本機看得到的東西畫出來，讓您重開、重新整理絕對有東西
     renderList();
 
-    // 【核心保險 2】：只在背景偷偷連雲端，成功才更新，失敗或遇到空資料死都不准擦除本機畫面！
+    // 【步驟 2】：背景同步（只有當雲端資料的「時間戳記」比你新，才允許蓋掉你的畫面）
     async function loadDataFromCloud() {
         try {
             const response = await fetch(`${API_URL}?t=${Date.now()}`);
             if (response.ok) {
                 const text = await response.text();
-                if (!text || text.trim() === "") return; // 雲端要是空的，什麼都別做
+                if (!text || text.trim() === "") {
+                    if (localState.items.length > 0) pushToCloud();
+                    return;
+                }
                 
-                const data = JSON.parse(text);
-                if (Array.isArray(data)) {
-                    // 只有當雲端資料真的跟本機長得不一樣時，才悄悄同步進來
-                    if (JSON.stringify(data) !== JSON.stringify(itemsArray)) {
-                        itemsArray = data;
-                        localStorage.setItem('chuchu_storage_list', JSON.stringify(itemsArray));
+                const cloudState = JSON.parse(text);
+                if (cloudState && Array.isArray(cloudState.items) && cloudState.ts) {
+                    // 關鍵安全鎖：雲端的修改時間比本機新，才准收下
+                    if (cloudState.ts > localState.ts) {
+                        localState = cloudState;
+                        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState));
                         renderList();
+                        statusText.textContent = '☁️ 雲端雙向即時同步中';
+                    } else if (localState.ts > cloudState.ts) {
+                        // 如果我本機的時間比較新，順手把雲端救回來（蓋掉雲端的舊/空資料）
+                        pushToCloud();
+                    } else {
+                        statusText.textContent = '☁️ 雲端雙向即時同步中';
                     }
-                    statusText.textContent = '☁️ 雙機雲端即時同步中';
                 }
             } else if (response.status === 404) {
-                statusText.textContent = '☁️ 雲端已準備就緒';
+                // 雲端是空的，但本機有東西，立刻把本機的送上去填滿雲端
+                if (localState.items.length > 0) pushToCloud();
             }
         } catch (error) {
             console.error(error);
-            statusText.textContent = '⚠️ 雲端塞車，目前使用本機安全模式';
+            statusText.textContent = '⚠️ 網路連線中（本地數據已安全保護）';
         }
     }
 
-    async function saveDataToCloud() {
-        // 先強行鎖進手機本機，死都不能丟
-        localStorage.setItem('chuchu_storage_list', JSON.stringify(itemsArray));
-        
+    async function pushToCloud() {
         try {
             await fetch(API_URL, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(itemsArray)
+                body: JSON.stringify(localState)
             });
-            statusText.textContent = '☁️ 雙機雲端即時同步中';
+            statusText.textContent = '☁️ 雲端雙向即時同步中';
         } catch (error) {
             console.error(error);
-            statusText.textContent = '⚠️ 網路不穩，已先安全存在您手機裡';
         }
     }
 
     function addItem() {
         const text = itemInput.value.trim();
         if (text === '') return;
-        itemsArray.push({ id: Date.now(), text: text, completed: false });
+        
+        localState.items.push({ id: Date.now(), text: text, completed: false });
+        localState.ts = Date.now(); // 更新本機時間戳記
+        
         itemInput.value = '';
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState)); // 0秒寫死在本機硬碟
         renderList(); 
-        saveDataToCloud(); // 存本機並嘗試送雲端
+        pushToCloud(); // 背景嘗試推上去
     }
 
     function toggleItem(id) {
-        itemsArray = itemsArray.map(item => item.id === id ? { ...item, completed: !item.completed } : item);
+        localState.items = localState.items.map(item => item.id === id ? { ...item, completed: !item.completed } : item);
+        localState.ts = Date.now();
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState));
         renderList();
-        saveDataToCloud(); 
+        pushToCloud(); 
     }
 
     function deleteItem(id) {
-        itemsArray = itemsArray.filter(item => item.id !== id);
+        localState.items = localState.items.filter(item => item.id !== id);
+        localState.ts = Date.now();
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState));
         renderList();
-        saveDataToCloud(); 
+        pushToCloud(); 
     }
 
     function renderList() {
         todoList.innerHTML = '';
-        itemsArray.forEach(item => {
+        localState.items.forEach(item => {
             const li = document.createElement('li');
             li.className = `todo-item ${item.completed ? 'completed' : ''}`;
             const leftDiv = document.createElement('div');
@@ -153,7 +166,7 @@
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
     
-    // 背景執行同步
+    // 背景執行
     loadDataFromCloud();
     setInterval(loadDataFromCloud, 5000);
 </script>
