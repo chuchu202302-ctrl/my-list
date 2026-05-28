@@ -35,27 +35,31 @@
     <ul class="todo-list" id="todoList"></ul>
 </div>
 <script>
-    // 🌟 保證暢通的獨立專屬公共管道
-    const API_URL = 'https://kvdb.io/66Z6YV9wNqMepAkm8wFv5k/chuchu_family_list_v3';
+    // 🌟 重新啟用完全乾淨、專屬的獨立大廠即時管道
+    const API_URL = 'https://kvdb.io/66Z6YV9wNqMepAkm8wFv5k/chuchu_family_list_v4';
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
     const todoList = document.getElementById('todoList');
     const statusText = document.getElementById('statusText');
-    let itemsArray = [];
+    
+    // 一開始確保它是個活生生、能塞東西的空籃子
+    let itemsArray = []; 
 
     async function loadDataFromCloud() {
         try {
             const response = await fetch(`${API_URL}?t=${Date.now()}`);
             if (response.ok) {
                 const data = await response.json();
-                // 🛑 核心防護鎖：只有雲端真正傳回「有效的陣列清單」，才准覆蓋畫面
                 if (Array.isArray(data)) {
                     itemsArray = data;
                     renderList();
                     statusText.textContent = '☁️ 雲端雙向即時同步中';
                 }
             } else if (response.status === 404) {
-                // 如果雲端是乾淨的，只顯示提示，絕對不亂洗掉本地剛輸入的陣列
+                // 💡 關鍵修正：如果是全新空抽屜，確保籃子是乾淨可用的空陣列，絕對不崩潰
+                if (!Array.isArray(itemsArray)) {
+                    itemsArray = [];
+                }
                 statusText.textContent = '☁️ 雲端已就緒，請開始新增物品';
             }
         } catch (error) {
@@ -65,9 +69,7 @@
     }
 
     async function saveDataToCloud() {
-        // 🛑 安全鎖：如果陣列在不知情狀況下變空了，絕對不送出，防止誤擦除
-        if (!itemsArray) return;
-        
+        if (!Array.isArray(itemsArray)) return;
         statusText.textContent = '⚡ 正在即時同步至另一半手機...';
         try {
             const response = await fetch(API_URL, {
@@ -85,6 +87,10 @@
     function addItem() {
         const text = itemInput.value.trim();
         if (text === '') return;
+        
+        // 確保萬無一失，防護網再鎖一次
+        if (!Array.isArray(itemsArray)) itemsArray = [];
+        
         itemsArray.push({ id: Date.now(), text: text, completed: false });
         itemInput.value = '';
         renderList(); 
@@ -105,6 +111,8 @@
 
     function renderList() {
         todoList.innerHTML = '';
+        if (!Array.isArray(itemsArray)) return;
+        
         itemsArray.forEach(item => {
             const li = document.createElement('li');
             li.className = `todo-item ${item.completed ? 'completed' : ''}`;
@@ -134,9 +142,9 @@
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
     
-    // 啟動流程
+    // 立即執行
     loadDataFromCloud();
-    // 每 5 秒雷達背景比對
+    // 每 5 秒雷達背景同步
     setInterval(loadDataFromCloud, 5000);
 </script>
 </body>
