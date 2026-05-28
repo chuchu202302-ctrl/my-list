@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>時間拖延大師出門list</title>
     <style>
-        :root { --primary-color: #4a90e2; --bg-color: #f5f7fa; --card-bg: #ffffff; --text-color: #333333; --done-color: #999999; --delete-color: #ff5252; }
+        :root { --primary-color: #4a90e2; --bg-color: #f5f7fa; --card-bg: #ffffff; --text-color: #333333; --done-color: #999999; --delete-color: #ff5252; --share-color: #2ecc71; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); padding: 20px 15px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 500px; background: var(--card-bg); padding: 25px 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); }
         h1 { font-size: 1.5rem; text-align: center; margin-bottom: 5px; color: #3a7bd5; }
-        .status-text { text-align: center; font-size: 0.8rem; color: #4a90e2; margin-bottom: 20px; font-weight: bold; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        .status-text { text-align: center; font-size: 0.8rem; color: #777; margin-bottom: 15px; font-weight: bold; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
         input[type="text"] { flex: 1; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; outline: none; }
         input[type="text"]:focus { border-color: var(--primary-color); }
         button.add-btn { padding: 12px 20px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        .share-btn { width: 100%; padding: 14px; background-color: var(--share-color); color: white; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(46, 204, 113, 0.2); }
         .todo-list { list-style: none; }
         .todo-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 10px; border-bottom: 1px solid #f0f0f0; }
         .todo-item-left { display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer; }
@@ -27,7 +28,10 @@
 <body>
 <div class="container">
     <h1>🎒時間拖延大師出門list</h1>
-    <div class="status-text" id="statusText">系統安全防護中</div>
+    <div class="status-text" id="statusText">🔒 本地安全防護模式 (重整絕不丟失)</div>
+    
+    <button class="share-btn" id="shareBtn">🔗 複製同步連結給老公</button>
+
     <div class="input-group">
         <input type="text" id="itemInput" placeholder="輸入需要攜帶的物品...如：奶瓶" maxlength="30">
         <button class="add-btn" id="addBtn">新增</button>
@@ -35,109 +39,79 @@
     <ul class="todo-list" id="todoList"></ul>
 </div>
 <script>
-    // 更換全新、格式絕對合法的雲端專屬通道
-    const API_URL = 'https://kvdb.io/66Z6YV9wNqMepAkm8wFv5k/chuchu_family_v5';
-    const LOCAL_KEY = 'chuchu_list_v5';
-
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
     const todoList = document.getElementById('todoList');
     const statusText = document.getElementById('statusText');
+    const shareBtn = document.getElementById('shareBtn');
     
-    // 初始化狀態結構（帶有最後修改時間戳記）
-    let localState = { items: [], ts: 0 }; 
+    const LOCAL_KEY = 'chuchu_perfect_local_list';
+    let itemsArray = [];
 
-    // 【步驟 1】：一打開網頁，零秒直接讀取手機本機記憶，這行跑完就注定重整絕不會變空！
-    const saved = localStorage.getItem(LOCAL_KEY);
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            if (parsed && Array.isArray(parsed.items)) { localState = parsed; }
-        } catch(e) { console.error(e); }
+    // 【核心步驟 1】：檢查網址裡有沒有另一半傳過來的暗號
+    function urlDecodeData() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const encodedData = urlParams.get('listData');
+        if (encodedData) {
+            try {
+                // 解開加密字串
+                const decodedText = decodeURIComponent(atob(encodedData));
+                const parsed = JSON.parse(decodedText);
+                if (Array.isArray(parsed)) {
+                    itemsArray = parsed;
+                    localStorage.setItem(LOCAL_KEY, JSON.stringify(itemsArray));
+                    
+                    // 把網址後面的髒尾巴洗掉，恢復乾淨網址
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    statusText.textContent = '✅ 已成功同步最新清單！';
+                    setTimeout(() => { statusText.textContent = '🔒 本地安全防護模式 (重整絕不丟失)'; }, 3000);
+                }
+            } catch (e) {
+                console.error("解碼失敗", e);
+            }
+        }
+    }
+
+    // 先執行網址解碼
+    urlDecodeData();
+    
+    // 如果網址沒有傳新資料，就讀本機原本存的
+    if (itemsArray.length === 0) {
+        const saved = localStorage.getItem(LOCAL_KEY);
+        if (saved) {
+            try { itemsArray = JSON.parse(saved) || []; } catch(e) { itemsArray = []; }
+        }
     }
     renderList();
 
-    // 【步驟 2】：背景同步（只有當雲端資料的「時間戳記」比你新，才允許蓋掉你的畫面）
-    async function loadDataFromCloud() {
-        try {
-            const response = await fetch(`${API_URL}?t=${Date.now()}`);
-            if (response.ok) {
-                const text = await response.text();
-                if (!text || text.trim() === "") {
-                    if (localState.items.length > 0) pushToCloud();
-                    return;
-                }
-                
-                const cloudState = JSON.parse(text);
-                if (cloudState && Array.isArray(cloudState.items) && cloudState.ts) {
-                    // 關鍵安全鎖：雲端的修改時間比本機新，才准收下
-                    if (cloudState.ts > localState.ts) {
-                        localState = cloudState;
-                        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState));
-                        renderList();
-                        statusText.textContent = '☁️ 雲端雙向即時同步中';
-                    } else if (localState.ts > cloudState.ts) {
-                        // 如果我本機的時間比較新，順手把雲端救回來（蓋掉雲端的舊/空資料）
-                        pushToCloud();
-                    } else {
-                        statusText.textContent = '☁️ 雲端雙向即時同步中';
-                    }
-                }
-            } else if (response.status === 404) {
-                // 雲端是空的，但本機有東西，立刻把本機的送上去填滿雲端
-                if (localState.items.length > 0) pushToCloud();
-            }
-        } catch (error) {
-            console.error(error);
-            statusText.textContent = '⚠️ 網路連線中（本地數據已安全保護）';
-        }
-    }
-
-    async function pushToCloud() {
-        try {
-            await fetch(API_URL, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(localState)
-            });
-            statusText.textContent = '☁️ 雲端雙向即時同步中';
-        } catch (error) {
-            console.error(error);
-        }
+    function saveToLocal() {
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(itemsArray));
     }
 
     function addItem() {
         const text = itemInput.value.trim();
         if (text === '') return;
-        
-        localState.items.push({ id: Date.now(), text: text, completed: false });
-        localState.ts = Date.now(); // 更新本機時間戳記
-        
+        itemsArray.push({ id: Date.now(), text: text, completed: false });
         itemInput.value = '';
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState)); // 0秒寫死在本機硬碟
-        renderList(); 
-        pushToCloud(); // 背景嘗試推上去
+        saveToLocal();
+        renderList();
     }
 
     function toggleItem(id) {
-        localState.items = localState.items.map(item => item.id === id ? { ...item, completed: !item.completed } : item);
-        localState.ts = Date.now();
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState));
+        itemsArray = itemsArray.map(item => item.id === id ? { ...item, completed: !item.completed } : item);
+        saveToLocal();
         renderList();
-        pushToCloud(); 
     }
 
     function deleteItem(id) {
-        localState.items = localState.items.filter(item => item.id !== id);
-        localState.ts = Date.now();
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(localState));
+        itemsArray = itemsArray.filter(item => item.id !== id);
+        saveToLocal();
         renderList();
-        pushToCloud(); 
     }
 
     function renderList() {
         todoList.innerHTML = '';
-        localState.items.forEach(item => {
+        itemsArray.forEach(item => {
             const li = document.createElement('li');
             li.className = `todo-item ${item.completed ? 'completed' : ''}`;
             const leftDiv = document.createElement('div');
@@ -146,7 +120,7 @@
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = item.completed;
-            checkbox.onclick = (e) => e.stopPropagation(); 
+            checkbox.onclick = (e) => e.stopPropagation();
             checkbox.onchange = () => toggleItem(item.id);
             const span = document.createElement('span');
             span.className = 'item-text';
@@ -163,12 +137,31 @@
         });
     }
 
+    // 【核心步驟 2】：點擊按鈕，打包資料變成連結複製起來
+    shareBtn.addEventListener('click', () => {
+        try {
+            const jsonString = JSON.stringify(itemsArray);
+            const encodedData = btoa(encodeURIComponent(jsonString));
+            const shareUrl = `${window.location.origin}${window.location.pathname}?listData=${encodedData}`;
+            
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                const originalText = shareBtn.textContent;
+                shareBtn.textContent = '✅ 複製成功！快傳給老公 LINE';
+                shareBtn.style.backgroundColor = '#27ae60';
+                setTimeout(() => {
+                    shareBtn.textContent = originalText;
+                    shareBtn.style.backgroundColor = '#2ecc71';
+                }, 2500);
+            }).catch(err => {
+                alert('複製失敗，請直接手動複製您目前的瀏覽器網址傳給老公！');
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    });
+
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
-    
-    // 背景執行
-    loadDataFromCloud();
-    setInterval(loadDataFromCloud, 5000);
 </script>
 </body>
 </html>
