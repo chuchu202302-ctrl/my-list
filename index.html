@@ -28,11 +28,8 @@
         .todo-item-left { display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer; }
         input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; accent-color: var(--primary-color); }
         .item-text { font-size: 1.1rem; word-break: break-all; }
-        
         .completed .item-text { color: var(--done-color); text-decoration: line-through; }
         .delete-btn { background: none; border: none; color: var(--delete-color); font-size: 0.9rem; cursor: pointer; padding: 5px 8px; }
-        
-        /* 載入中動畫提示 */
         .loading { opacity: 0.5; pointer-events: none; }
     </style>
 </head>
@@ -51,11 +48,8 @@
 </div>
 
 <script>
-    // ================= 【🌟 核心設定】 =================
-    // 修正點：將暗號中間的空格全部改為底線 _，符合雲端資料庫嚴格的命名規範
     const SECRET_BUCKET = 'my_OneOneList_PAPA_and_MAMA'; 
     const API_URL = `https://kvdb.io/JanE4pCgH28wshSBy968A9/items_${SECRET_BUCKET}`;
-    // ===================================================
 
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
@@ -65,16 +59,13 @@
 
     let itemsArray = [];
 
-    // 初始化：從雲端撈取資料
+    // 初始化讀取（🌟 已移除會導致連線失敗的衝突標頭）
     async function loadDataFromCloud() {
         showStatus('正在從雲端讀取最新清單...');
         try {
+            // 只保留網址後面的時間戳記，這樣既能破解快取，又絕對不會被雲端封鎖！
             const response = await fetch(`${API_URL}?t=${Date.now()}`, {
-                method: 'GET',
-                headers: {
-                    'Cache-Control': 'no-cache',
-                    'Pragma': 'no-cache'
-                }
+                method: 'GET'
             });
             
             if (response.status === 404) {
@@ -93,7 +84,7 @@
         }
     }
 
-    // 將資料儲存回雲端
+    // 儲存至雲端
     async function saveDataToCloud() {
         showStatus('正在同步更新至全家人手機...');
         mainContainer.classList.add('loading');
@@ -105,54 +96,41 @@
             });
             
             if (!response.ok) {
-                throw new Error('網路回應不正確');
+                throw new Error('伺服器拒絕儲存，狀態碼: ' + response.status);
             }
             showStatus('☁️ 雲端同步成功（多裝置即時連線中）');
         } catch (error) {
             console.error(error);
-            showStatus('⚠️ 同步失敗，請檢查網路');
-            alert('雲端儲存失敗，請確認網路是否通暢！');
+            showStatus('⚠️ 同步失敗');
+            alert('儲存失敗，請檢查網路連線！');
         } finally {
             mainContainer.classList.remove('loading');
         }
     }
 
-    // 狀態提示文字
-    function showStatus(msg) {
-        statusText.textContent = msg;
-    }
+    function showStatus(msg) { statusText.textContent = msg; }
 
-    // 新增物品
     async function addItem() {
         const text = itemInput.value.trim();
         if (text === '') return;
-
-        const newItem = { id: Date.now(), text: text, completed: false };
-        itemsArray.push(newItem);
-        
+        itemsArray.push({ id: Date.now(), text: text, completed: false });
         itemInput.value = '';
         renderList(); 
         await saveDataToCloud(); 
     }
 
-    // 切換勾選狀態
     async function toggleItem(id) {
-        itemsArray = itemsArray.map(item => {
-            if (item.id === id) return { ...item, completed: !item.completed };
-            return item;
-        });
+        itemsArray = itemsArray.map(item => item.id === id ? { ...item, completed: !item.completed } : item);
         renderList();
         await saveDataToCloud(); 
     }
 
-    // 真正刪除物品
     async function deleteItem(id) {
         itemsArray = itemsArray.filter(item => item.id !== id);
         renderList();
         await saveDataToCloud(); 
     }
 
-    // 渲染畫面
     function renderList() {
         todoList.innerHTML = '';
         itemsArray.forEach(item => {
@@ -179,10 +157,7 @@
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-btn';
             deleteBtn.textContent = '刪除';
-            deleteBtn.onclick = (e) => {
-                e.stopPropagation(); 
-                deleteItem(item.id);
-            };
+            deleteBtn.onclick = (e) => { e.stopPropagation(); deleteItem(item.id); };
 
             li.appendChild(leftDiv);
             li.appendChild(deleteBtn);
@@ -190,11 +165,8 @@
         });
     }
 
-    // 事件監聽
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
-
-    // 網頁打開時，自動啟動讀取
     loadDataFromCloud();
 </script>
 
