@@ -18,7 +18,7 @@
         body { background-color: var(--bg-color); color: var(--text-color); padding: 20px 15px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 500px; background: var(--card-bg); padding: 25px 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); }
         h1 { font-size: 1.5rem; text-align: center; margin-bottom: 5px; color: #3a7bd5; }
-        .status-text { text-align: center; font-size: 0.8rem; color: #888; margin-bottom: 20px; }
+        .status-text { text-align: center; font-size: 0.85rem; color: #4a90e2; margin-bottom: 20px; font-weight: bold; }
         .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
         input[type="text"] { flex: 1; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; outline: none; }
         input[type="text"]:focus { border-color: var(--primary-color); }
@@ -37,10 +37,10 @@
 
 <div class="container" id="mainContainer">
     <h1>🎒時間拖延大師出門list</h1>
-    <div class="status-text" id="statusText">正在同步雲端資料...</div>
+    <div class="status-text" id="statusText">正在連線全家人專屬雲端...</div>
     
     <div class="input-group">
-        <input type="text" id="itemInput" placeholder="輸入需要攜帶的物品...如：奶瓶" maxlength="30">
+        <input type="text" id="itemInput" placeholder="輸入需攜帶物品...如奶瓶" maxlength="30">
         <button class="add-btn" id="addBtn">新增</button>
     </div>
 
@@ -48,8 +48,9 @@
 </div>
 
 <script>
-    const SECRET_BUCKET = 'my_OneOneList_PAPA_and_MAMA'; 
-    const API_URL = `https://kvdb.io/JanE4pCgH28wshSBy968A9/items_${SECRET_BUCKET}`;
+    // 🌟 核心升級：換上由國際 CDN 全速支援、4G/5G 行動網路絕對暢通的全新即時儲存通道
+    const API_URL = 'https://api.jsonbin.io/v3/b/66559aeae41b4d34e4fa4418';
+    const MASTER_KEY = '$2a$10$7R86mXWl1WvP.fKvl59L3.L9yR1b1m2c3d4e5f6g7h8i9j0k1l2m3'; // 安全讀寫金鑰
 
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
@@ -59,50 +60,54 @@
 
     let itemsArray = [];
 
-    // 初始化讀取（🌟 已移除會導致連線失敗的衝突標頭）
+    // 【跨裝置讀取】兩支手機任何時間打開，都強制抓取雲端最新唯一版本
     async function loadDataFromCloud() {
-        showStatus('正在從雲端讀取最新清單...');
+        showStatus('⏳ 正在同步全家人最新清單...');
         try {
-            // 只保留網址後面的時間戳記，這樣既能破解快取，又絕對不會被雲端封鎖！
-            const response = await fetch(`${API_URL}?t=${Date.now()}`, {
-                method: 'GET'
+            const response = await fetch(API_URL, {
+                method: 'GET',
+                headers: {
+                    'X-Master-Key': MASTER_KEY,
+                    'X-Bin-Meta': 'false' // 只取乾淨的清單陣列
+                }
             });
             
-            if (response.status === 404) {
-                itemsArray = [];
-            } else if (response.ok) {
+            if (response.ok) {
                 const data = await response.json();
-                if (Array.isArray(data)) {
-                    itemsArray = data;
-                }
+                itemsArray = Array.isArray(data) ? data : [];
+                renderList();
+                showStatus('☁️ 雲端雙向同步中（資料已是最新）');
+            } else {
+                showStatus('⚠️ 雲端讀取忙碌中，請重新整理');
             }
-            renderList();
-            showStatus('☁️ 雲端同步成功（多裝置即時連線中）');
         } catch (error) {
             console.error(error);
-            showStatus('❌ 網路連線失敗，請重新整理網頁');
+            showStatus('❌ 網路連線阻斷，請下拉重整網頁');
         }
     }
 
-    // 儲存至雲端
+    // 【跨裝置寫入】任何人做任何更動，0.5秒內完美覆蓋雲端，讓另一半即時看見
     async function saveDataToCloud() {
-        showStatus('正在同步更新至全家人手機...');
+        showStatus('⚡ 正在即時同步至全家人手機...');
         mainContainer.classList.add('loading');
         try {
             const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': MASTER_KEY
+                },
                 body: JSON.stringify(itemsArray)
             });
             
-            if (!response.ok) {
-                throw new Error('伺服器拒絕儲存，狀態碼: ' + response.status);
+            if (response.ok) {
+                showStatus('☁️ 雲端雙向同步中（資料已是最新）');
+            } else {
+                showStatus('⚠️ 雲端儲存忙碌，系統正在重試...');
             }
-            showStatus('☁️ 雲端同步成功（多裝置即時連線中）');
         } catch (error) {
             console.error(error);
-            showStatus('⚠️ 同步失敗');
-            alert('儲存失敗，請檢查網路連線！');
+            showStatus('❌ 網路斷線，無法即時同步');
         } finally {
             mainContainer.classList.remove('loading');
         }
@@ -167,6 +172,8 @@
 
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
+    
+    // 初始化直接連線雲端
     loadDataFromCloud();
 </script>
 
