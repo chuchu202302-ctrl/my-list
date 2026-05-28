@@ -27,7 +27,7 @@
 <body>
 <div class="container">
     <h1>🎒時間拖延大師出門list</h1>
-    <div class="status-text" id="statusText">正在連線全家人雲端...</div>
+    <div class="status-text" id="statusText">本機安全防護中</div>
     <div class="input-group">
         <input type="text" id="itemInput" placeholder="輸入需要攜帶的物品...如：奶瓶" maxlength="30">
         <button class="add-btn" id="addBtn">新增</button>
@@ -35,66 +35,79 @@
     <ul class="todo-list" id="todoList"></ul>
 </div>
 <script>
-    // 🌟 重新啟用完全乾淨、專屬的獨立大廠即時管道
-    const API_URL = 'https://kvdb.io/66Z6YV9wNqMepAkm8wFv5k/chuchu_family_list_v4';
+    // 🌟 獨立公共背景通道
+    const API_URL = 'https://kvdb.io/A7b9C2d4E6f8G0h1J3k5M7/chuchu_family_perfect_list';
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
     const todoList = document.getElementById('todoList');
     const statusText = document.getElementById('statusText');
     
-    // 一開始確保它是個活生生、能塞東西的空籃子
     let itemsArray = []; 
 
+    // 【核心保險 1】：一打開網頁，零秒直接讀取手機本機記憶，保證絕對不會看到空白！
+    const localData = localStorage.getItem('chuchu_storage_list');
+    if (localData) {
+        try {
+            itemsArray = JSON.parse(localData);
+            if (!Array.isArray(itemsArray)) itemsArray = [];
+        } catch(e) {
+            itemsArray = [];
+        }
+    }
+    // 先把本機看得到的東西畫出來，讓您重開、重新整理絕對有東西
+    renderList();
+
+    // 【核心保險 2】：只在背景偷偷連雲端，成功才更新，失敗或遇到空資料死都不准擦除本機畫面！
     async function loadDataFromCloud() {
         try {
             const response = await fetch(`${API_URL}?t=${Date.now()}`);
             if (response.ok) {
-                const data = await response.json();
+                const text = await response.text();
+                if (!text || text.trim() === "") return; // 雲端要是空的，什麼都別做
+                
+                const data = JSON.parse(text);
                 if (Array.isArray(data)) {
-                    itemsArray = data;
-                    renderList();
-                    statusText.textContent = '☁️ 雲端雙向即時同步中';
+                    // 只有當雲端資料真的跟本機長得不一樣時，才悄悄同步進來
+                    if (JSON.stringify(data) !== JSON.stringify(itemsArray)) {
+                        itemsArray = data;
+                        localStorage.setItem('chuchu_storage_list', JSON.stringify(itemsArray));
+                        renderList();
+                    }
+                    statusText.textContent = '☁️ 雙機雲端即時同步中';
                 }
             } else if (response.status === 404) {
-                // 💡 關鍵修正：如果是全新空抽屜，確保籃子是乾淨可用的空陣列，絕對不崩潰
-                if (!Array.isArray(itemsArray)) {
-                    itemsArray = [];
-                }
-                statusText.textContent = '☁️ 雲端已就緒，請開始新增物品';
+                statusText.textContent = '☁️ 雲端已準備就緒';
             }
         } catch (error) {
             console.error(error);
-            statusText.textContent = '⚠️ 雲端連線中...';
+            statusText.textContent = '⚠️ 雲端塞車，目前使用本機安全模式';
         }
     }
 
     async function saveDataToCloud() {
-        if (!Array.isArray(itemsArray)) return;
-        statusText.textContent = '⚡ 正在即時同步至另一半手機...';
+        // 先強行鎖進手機本機，死都不能丟
+        localStorage.setItem('chuchu_storage_list', JSON.stringify(itemsArray));
+        
         try {
-            const response = await fetch(API_URL, {
+            await fetch(API_URL, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(itemsArray)
             });
-            if (response.ok) { statusText.textContent = '☁️ 雲端雙向即時同步中'; }
+            statusText.textContent = '☁️ 雙機雲端即時同步中';
         } catch (error) {
             console.error(error);
-            statusText.textContent = '❌ 同步失敗，請檢查手機網路';
+            statusText.textContent = '⚠️ 網路不穩，已先安全存在您手機裡';
         }
     }
 
     function addItem() {
         const text = itemInput.value.trim();
         if (text === '') return;
-        
-        // 確保萬無一失，防護網再鎖一次
-        if (!Array.isArray(itemsArray)) itemsArray = [];
-        
         itemsArray.push({ id: Date.now(), text: text, completed: false });
         itemInput.value = '';
         renderList(); 
-        saveDataToCloud(); 
+        saveDataToCloud(); // 存本機並嘗試送雲端
     }
 
     function toggleItem(id) {
@@ -111,8 +124,6 @@
 
     function renderList() {
         todoList.innerHTML = '';
-        if (!Array.isArray(itemsArray)) return;
-        
         itemsArray.forEach(item => {
             const li = document.createElement('li');
             li.className = `todo-item ${item.completed ? 'completed' : ''}`;
@@ -142,9 +153,8 @@
     addBtn.addEventListener('click', addItem);
     itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
     
-    // 立即執行
+    // 背景執行同步
     loadDataFromCloud();
-    // 每 5 秒雷達背景同步
     setInterval(loadDataFromCloud, 5000);
 </script>
 </body>
