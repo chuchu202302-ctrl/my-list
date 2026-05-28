@@ -29,7 +29,6 @@
         input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; accent-color: var(--primary-color); }
         .item-text { font-size: 1.1rem; word-break: break-all; }
         
-        /* 當項目被加上 completed 類別時，文字會變灰並加上刪除線，但項目依然保留在畫面上 */
         .completed .item-text { color: var(--done-color); text-decoration: line-through; }
         .delete-btn { background: none; border: none; color: var(--delete-color); font-size: 0.9rem; cursor: pointer; padding: 5px 8px; }
         
@@ -52,11 +51,10 @@
 </div>
 
 <script>
-    // ================= 【🌟 核心設定：您專屬的秘密金鑰】 =================
-    // 提示：網址代碼中盡量避免空格，這邊自動幫您轉為 URL 安全編碼以防雲端同步出錯
+    // ================= 【🌟 核心設定】 =================
     const SECRET_BUCKET = encodeURIComponent('my OneOneList PAPAandMAMA'); 
     const API_URL = `https://kvdb.io/JanE4pCgH28wshSBy968A9/items_${SECRET_BUCKET}`;
-    // =================================================================
+    // ===================================================
 
     const itemInput = document.getElementById('itemInput');
     const addBtn = document.getElementById('addBtn');
@@ -68,13 +66,26 @@
 
     // 初始化：從雲端撈取資料
     async function loadDataFromCloud() {
-        showStatus('正在讀取最新清單...');
+        showStatus('正在從雲端讀取最新清單...');
         try {
-            const response = await fetch(API_URL);
+            // 【修正點 1】網址後方加入時間戳記 ?t=...，強迫瀏覽器繞過快取，每次都抓最新真實資料
+            const response = await fetch(`${API_URL}?t=${Date.now()}`, {
+                method: 'GET',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            
             if (response.status === 404) {
+                // 404 代表雲端完全沒資料（第一次使用）
                 itemsArray = [];
-            } else {
-                itemsArray = await response.json();
+            } else if (response.ok) {
+                const data = await response.json();
+                // 【修正點 2】安全防護：確保抓下來的資料是陣列，才覆蓋進去，防範抓到空值
+                if (Array.isArray(data)) {
+                    itemsArray = data;
+                }
             }
             renderList();
             showStatus('☁️ 雲端同步成功（多裝置即時連線中）');
@@ -89,20 +100,27 @@
         showStatus('正在同步更新至全家人手機...');
         mainContainer.classList.add('loading');
         try {
-            await fetch(API_URL, {
+            const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(itemsArray)
             });
+            
+            if (!response.ok) {
+                throw new Error('網路回應不正確');
+            }
             showStatus('☁️ 雲端同步成功（多裝置即時連線中）');
         } catch (error) {
-            alert('同步失敗，請檢查網路連線！');
+            console.error(error);
+            showStatus('⚠️ 同步失敗，請檢查網路');
+            alert('雲端儲存失敗，請確認網路是否通暢！');
         } finally {
             mainContainer.classList.remove('loading');
         }
     }
 
     // 狀態提示文字
+    function statusText修改(msg) {}
     function showStatus(msg) {
         statusText.textContent = msg;
     }
@@ -120,21 +138,21 @@
         await saveDataToCloud(); 
     }
 
-    // 【動作一】切換勾選狀態（只負責打勾劃線，保留在清單中）
+    // 切換勾選狀態
     async function toggleItem(id) {
         itemsArray = itemsArray.map(item => {
             if (item.id === id) return { ...item, completed: !item.completed };
             return item;
         });
         renderList();
-        await saveDataToCloud(); // 狀態同步到雲端，別的手機也會看到打勾
+        await saveDataToCloud(); 
     }
 
-    // 【動作二】真正刪除物品（只有按下刪除按鈕才會觸發）
+    // 真正刪除物品
     async function deleteItem(id) {
         itemsArray = itemsArray.filter(item => item.id !== id);
         renderList();
-        await saveDataToCloud(); // 從雲端資料庫徹底移除
+        await saveDataToCloud(); 
     }
 
     // 渲染畫面
@@ -142,7 +160,6 @@
         todoList.innerHTML = '';
         itemsArray.forEach(item => {
             const li = document.createElement('li');
-            // 如果完曾狀態為 true，動態加上 completed 樣式類別
             li.className = `todo-item ${item.completed ? 'completed' : ''}`;
 
             const leftDiv = document.createElement('div');
@@ -152,7 +169,7 @@
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = item.completed;
-            checkbox.onclick = (e) => e.stopPropagation(); // 防止點擊方框時重複觸發父層事件
+            checkbox.onclick = (e) => e.stopPropagation(); 
             checkbox.onchange = () => toggleItem(item.id);
 
             const span = document.createElement('span');
@@ -162,12 +179,11 @@
             leftDiv.appendChild(checkbox);
             leftDiv.appendChild(span);
 
-            // 右側獨立的刪除按鈕
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-btn';
             deleteBtn.textContent = '刪除';
             deleteBtn.onclick = (e) => {
-                e.stopPropagation(); // 阻止事件冒泡，不觸發打勾，直接進行刪除
+                e.stopPropagation(); 
                 deleteItem(item.id);
             };
 
