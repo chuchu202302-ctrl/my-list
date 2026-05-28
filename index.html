@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時間拖延大師出門list</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --done-color: #999999;
+            --delete-color: #ff5252;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 20px 15px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 500px; background: var(--card-bg); padding: 25px 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); }
+        h1 { font-size: 1.5rem; text-align: center; margin-bottom: 5px; color: #3a7bd5; }
+        .status-text { text-align: center; font-size: 0.8rem; color: #888; margin-bottom: 20px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] { flex: 1; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; outline: none; }
+        input[type="text"]:focus { border-color: var(--primary-color); }
+        button.add-btn { padding: 12px 20px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        .todo-list { list-style: none; }
+        .todo-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 10px; border-bottom: 1px solid #f0f0f0; }
+        .todo-item-left { display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer; }
+        input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; accent-color: var(--primary-color); }
+        .item-text { font-size: 1.1rem; word-break: break-all; }
+        
+        /* 當項目被加上 completed 類別時，文字會變灰並加上刪除線，但項目依然保留在畫面上 */
+        .completed .item-text { color: var(--done-color); text-decoration: line-through; }
+        .delete-btn { background: none; border: none; color: var(--delete-color); font-size: 0.9rem; cursor: pointer; padding: 5px 8px; }
+        
+        /* 載入中動畫提示 */
+        .loading { opacity: 0.5; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="mainContainer">
+    <h1>🎒時間拖延大師出門list</h1>
+    <div class="status-text" id="statusText">正在同步雲端資料...</div>
+    
+    <div class="input-group">
+        <input type="text" id="itemInput" placeholder="輸入需要攜帶的物品...如：奶瓶" maxlength="30">
+        <button class="add-btn" id="addBtn">新增</button>
+    </div>
+
+    <ul class="todo-list" id="todoList"></ul>
+</div>
+
+<script>
+    // ================= 【🌟 核心設定：您專屬的秘密金鑰】 =================
+    // 提示：網址代碼中盡量避免空格，這邊自動幫您轉為 URL 安全編碼以防雲端同步出錯
+    const SECRET_BUCKET = encodeURIComponent('my OneOneList PAPAandMAMA'); 
+    const API_URL = `https://kvdb.io/JanE4pCgH28wshSBy968A9/items_${SECRET_BUCKET}`;
+    // =================================================================
+
+    const itemInput = document.getElementById('itemInput');
+    const addBtn = document.getElementById('addBtn');
+    const todoList = document.getElementById('todoList');
+    const statusText = document.getElementById('statusText');
+    const mainContainer = document.getElementById('mainContainer');
+
+    let itemsArray = [];
+
+    // 初始化：從雲端撈取資料
+    async function loadDataFromCloud() {
+        showStatus('正在讀取最新清單...');
+        try {
+            const response = await fetch(API_URL);
+            if (response.status === 404) {
+                itemsArray = [];
+            } else {
+                itemsArray = await response.json();
+            }
+            renderList();
+            showStatus('☁️ 雲端同步成功（多裝置即時連線中）');
+        } catch (error) {
+            console.error(error);
+            showStatus('❌ 網路連線失敗，請重新整理網頁');
+        }
+    }
+
+    // 將資料儲存回雲端
+    async function saveDataToCloud() {
+        showStatus('正在同步更新至全家人手機...');
+        mainContainer.classList.add('loading');
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(itemsArray)
+            });
+            showStatus('☁️ 雲端同步成功（多裝置即時連線中）');
+        } catch (error) {
+            alert('同步失敗，請檢查網路連線！');
+        } finally {
+            mainContainer.classList.remove('loading');
+        }
+    }
+
+    // 狀態提示文字
+    function showStatus(msg) {
+        statusText.textContent = msg;
+    }
+
+    // 新增物品
+    async function addItem() {
+        const text = itemInput.value.trim();
+        if (text === '') return;
+
+        const newItem = { id: Date.now(), text: text, completed: false };
+        itemsArray.push(newItem);
+        
+        itemInput.value = '';
+        renderList(); 
+        await saveDataToCloud(); 
+    }
+
+    // 【動作一】切換勾選狀態（只負責打勾劃線，保留在清單中）
+    async function toggleItem(id) {
+        itemsArray = itemsArray.map(item => {
+            if (item.id === id) return { ...item, completed: !item.completed };
+            return item;
+        });
+        renderList();
+        await saveDataToCloud(); // 狀態同步到雲端，別的手機也會看到打勾
+    }
+
+    // 【動作二】真正刪除物品（只有按下刪除按鈕才會觸發）
+    async function deleteItem(id) {
+        itemsArray = itemsArray.filter(item => item.id !== id);
+        renderList();
+        await saveDataToCloud(); // 從雲端資料庫徹底移除
+    }
+
+    // 渲染畫面
+    function renderList() {
+        todoList.innerHTML = '';
+        itemsArray.forEach(item => {
+            const li = document.createElement('li');
+            // 如果完曾狀態為 true，動態加上 completed 樣式類別
+            li.className = `todo-item ${item.completed ? 'completed' : ''}`;
+
+            const leftDiv = document.createElement('div');
+            leftDiv.className = 'todo-item-left';
+            leftDiv.onclick = () => toggleItem(item.id);
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = item.completed;
+            checkbox.onclick = (e) => e.stopPropagation(); // 防止點擊方框時重複觸發父層事件
+            checkbox.onchange = () => toggleItem(item.id);
+
+            const span = document.createElement('span');
+            span.className = 'item-text';
+            span.textContent = item.text;
+
+            leftDiv.appendChild(checkbox);
+            leftDiv.appendChild(span);
+
+            // 右側獨立的刪除按鈕
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.textContent = '刪除';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation(); // 阻止事件冒泡，不觸發打勾，直接進行刪除
+                deleteItem(item.id);
+            };
+
+            li.appendChild(leftDiv);
+            li.appendChild(deleteBtn);
+            todoList.appendChild(li);
+        });
+    }
+
+    // 事件監聽
+    addBtn.addEventListener('click', addItem);
+    itemInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
+
+    // 網頁打開時，自動啟動讀取
+    loadDataFromCloud();
+</script>
+
+</body>
+</html>
