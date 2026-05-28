@@ -52,7 +52,8 @@
 
 <script>
     // ================= 【🌟 核心設定】 =================
-    const SECRET_BUCKET = encodeURIComponent('my OneOneList PAPAandMAMA'); 
+    // 修正點：將暗號中間的空格全部改為底線 _，符合雲端資料庫嚴格的命名規範
+    const SECRET_BUCKET = 'my_OneOneList_PAPA_and_MAMA'; 
     const API_URL = `https://kvdb.io/JanE4pCgH28wshSBy968A9/items_${SECRET_BUCKET}`;
     // ===================================================
 
@@ -68,7 +69,6 @@
     async function loadDataFromCloud() {
         showStatus('正在從雲端讀取最新清單...');
         try {
-            // 【修正點 1】網址後方加入時間戳記 ?t=...，強迫瀏覽器繞過快取，每次都抓最新真實資料
             const response = await fetch(`${API_URL}?t=${Date.now()}`, {
                 method: 'GET',
                 headers: {
@@ -78,11 +78,9 @@
             });
             
             if (response.status === 404) {
-                // 404 代表雲端完全沒資料（第一次使用）
                 itemsArray = [];
             } else if (response.ok) {
                 const data = await response.json();
-                // 【修正點 2】安全防護：確保抓下來的資料是陣列，才覆蓋進去，防範抓到空值
                 if (Array.isArray(data)) {
                     itemsArray = data;
                 }
@@ -120,7 +118,6 @@
     }
 
     // 狀態提示文字
-    function statusText修改(msg) {}
     function showStatus(msg) {
         statusText.textContent = msg;
     }
